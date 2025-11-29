@@ -6,25 +6,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const mysql = require('mysql2');
-
+// ✅ KONEKSI DATABASE RAILWAY
 const db = mysql.createConnection(process.env.MYSQL_URL);
 
 db.connect((err) => {
     if (err) {
-        console.error("Koneksi gagal:", err);
-        return;
-    }
-    console.log("✅ Database Railway Connected!");
-});
-
-
-// ✅ CEK KONEKSI DB
-db.connect(err => {
-    if (err) {
-        console.error('DB ERROR:', err);
+        console.error("❌ Koneksi DB gagal:", err);
     } else {
-        console.log('✅ Database connected!');
+        console.log("✅ Database Railway Connected!");
     }
 });
 
@@ -73,11 +62,11 @@ app.post('/api/check', (req, res) => {
     const suggestions = saran(status);
 
     const sql = `
-    INSERT INTO health_history (name, age, height, weight, bmi, status)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `;
+        INSERT INTO health_history (name, age, height, weight, bmi, status)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `;
 
-    db.query(sql, [name, age, height, weight, bmi, status], (err, result) => {
+    db.query(sql, [name, age, height, weight, bmi, status], (err) => {
         if (err) return res.status(500).json({ error: err });
 
         res.json({
@@ -106,11 +95,8 @@ app.delete('/api/history/:id', (req, res) => {
     });
 });
 
-app.listen(3000, () => {
-    console.log("✅ Backend running on http://localhost:3000");
-});
-
+// ✅ PORT RAILWAY (WAJIB SEPERTI INI)
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log("Backend running on port " + PORT);
+    console.log("✅ Backend running on port " + PORT);
 });
