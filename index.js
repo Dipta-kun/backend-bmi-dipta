@@ -6,13 +6,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// GANTI SESUAI DATABASE KAMU
-const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: '', // kalau XAMPP biasanya kosong
-    database: 'bmi_db'
+const mysql = require('mysql2');
+
+const db = mysql.createConnection(process.env.MYSQL_URL);
+
+db.connect((err) => {
+    if (err) {
+        console.error("Koneksi gagal:", err);
+        return;
+    }
+    console.log("✅ Database Railway Connected!");
 });
+
 
 // ✅ CEK KONEKSI DB
 db.connect(err => {
