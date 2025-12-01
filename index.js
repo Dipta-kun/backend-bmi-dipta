@@ -3,7 +3,12 @@ const cors = require("cors");
 const mysql = require("mysql2");
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: "*",
+    methods: "GET,POST,DELETE",
+    allowedHeaders: "Content-Type"
+}));
+
 app.use(express.json());
 
 /* =========================
@@ -17,22 +22,25 @@ app.get("/", (req, res) => {
    ✅ KONEKSI DATABASE (AUTO: RAILWAY / LOCAL)
    ========================= */
 
-let db;
 
-if (process.env.MYSQL_URL) {
-    // ✅ MODE RAILWAY
-    db = mysql.createPool(process.env.MYSQL_URL);
-    console.log("✅ Menggunakan Database Railway");
-} else {
-    // ✅ MODE LOCAL XAMPP
-    db = mysql.createPool({
-        host: "localhost",
-        user: "root",
-        password: "", // isi kalau ada password
-        database: "railway", // ✅ sesuai database phpMyAdmin kamu
-    });
-    console.log("✅ Menggunakan Database Local (XAMPP)");
-}
+const db = mysql.createPool({
+    host: process.env.MYSQLHOST,
+    user: process.env.MYSQLUSER,
+    password: process.env.MYSQLPASSWORD,
+    port: process.env.MYSQLPORT,
+    database: process.env.MYSQLDATABASE
+});
+
+
+// ✅ TEST KONEKSI
+db.getConnection((err, connection) => {
+    if (err) {
+        console.error("❌ Koneksi DB gagal:", err);
+        return;
+    }
+    console.log("✅ Database Connected!");
+    connection.release();
+});
 
 db.getConnection((err, connection) => {
     if (err) {
