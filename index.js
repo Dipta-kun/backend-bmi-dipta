@@ -1,59 +1,36 @@
-const express = require("express");
-const cors = require("cors");
-const mysql = require("mysql2");
+const express = require('express');
+const cors = require('cors');
+const mysql = require('mysql2');
 
 const app = express();
-app.use(cors({
-    origin: "*",
-    methods: "GET,POST,DELETE",
-    allowedHeaders: "Content-Type"
-}));
-
+app.use(cors());
 app.use(express.json());
 
-/* =========================
-   ✅ ROOT ROUTE
-   ========================= */
-app.get("/", (req, res) => {
-    res.send("✅ Backend BMI API is Running!");
-});
-
-/* =========================
-   ✅ KONEKSI DATABASE (AUTO: RAILWAY / LOCAL)
-   ========================= */
-
-
+// 🔧 CONNECT DATABASE (PAKAI ENV DARI RAILWAY)
 const db = mysql.createPool({
-    host: process.env.MYSQLHOST,
-    user: process.env.MYSQLUSER,
-    password: process.env.MYSQLPASSWORD,
-    port: process.env.MYSQLPORT,
-    database: process.env.MYSQLDATABASE
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT || 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
 });
 
-
-// ✅ TEST KONEKSI
-db.getConnection((err, connection) => {
+// CEK KONEKSI
+db.getConnection((err, conn) => {
     if (err) {
         console.error("❌ Koneksi DB gagal:", err);
-        return;
+    } else {
+        console.log("✅ Database connected!");
+        conn.release();
     }
-    console.log("✅ Database Connected!");
-    connection.release();
 });
 
-db.getConnection((err, connection) => {
-    if (err) {
-        console.error("❌ Koneksi DB gagal:", err);
-        return;
-    }
-    console.log("✅ Database Connected!");
-    connection.release();
-});
-
-/* =========================
-   ✅ FUNGSI HITUNG BMI
-   ========================= */
+// =======================
+//  LOGIC BMI
+// =======================
 function hitungBMI(bb, tb) {
     const tinggiM = tb / 100;
     return +(bb / (tinggiM * tinggiM)).toFixed(1);
@@ -71,101 +48,67 @@ function saran(status) {
         return [
             "Jogging 20–30 menit",
             "Diet rendah gula",
-            "Latihan kalistenik ringan",
+            "Latihan kalistenik ringan"
         ];
     }
-
     if (status === "Kurus") {
         return [
             "Perbanyak nasi & protein",
             "Konsumsi susu & telur",
-            "Latihan beban ringan",
+            "Latihan beban ringan"
         ];
     }
-
     return [
         "Pertahankan pola makan sehat",
-        "Olahraga rutin 3x seminggu",
+        "Olahraga rutin 3x seminggu"
     ];
 }
 
-/* =========================
-   ✅ POST /api/check
-   ========================= */
-app.post("/api/check", (req, res) => {
-    const { name, age, height, weight } = req.body;
+// =======================
+//  API ENDPOINTS
+// =======================
 
-    if (!name || !age || !height || !weight) {
-        return res.status(400).json({ error: "Data tidak lengkap" });
-    }
+// CREATE DATA
+app.post('/api/check', (req, res) => {
+    const { name, age, height, weight } = req.body;
 
     const bmi = hitungBMI(weight, height);
     const status = statusBMI(bmi);
     const suggestions = saran(status);
 
     const sql = `
-    INSERT INTO health_history (name, age, height, weight, bmi, status)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `;
+        INSERT INTO health_history (name, age, height, weight, bmi, status)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `;
 
-    db.query(
-        sql, [name, age, height, weight, bmi, status],
-        (err) => {
-            if (err) {
-                console.error("❌ Gagal insert:", err);
-                return res.status(500).json({ error: "Gagal menyimpan data" });
-            }
+    db.query(sql, [name, age, height, weight, bmi, status], (err) => {
+        if (err) return res.status(500).json({ error: err });
 
-            res.json({
-                bmi,
-                status,
-                suggestions,
-                saved: true,
-            });
-        }
-    );
+        res.json({ bmi, status, suggestions, saved: true });
+    });
 });
 
-/* =========================
-   ✅ GET /api/history
-   ========================= */
-app.get("/api/history", (req, res) => {
-    db.query(
-        "SELECT * FROM health_history ORDER BY id DESC",
-        (err, rows) => {
-            if (err) {
-                console.error("❌ Gagal ambil data:", err);
-                return res.status(500).json({ error: "Gagal mengambil data" });
-            }
-            res.json(rows);
-        }
-    );
+// READ DATA
+app.get('/api/history', (req, res) => {
+    db.query("SELECT * FROM health_history ORDER BY id DESC", (err, rows) => {
+        if (err) return res.status(500).json({ error: err });
+        res.json(rows);
+    });
 });
 
-/* =========================
-   ✅ DELETE /api/history/:id
-   ========================= */
-app.delete("/api/history/:id", (req, res) => {
+// DELETE DATA
+app.delete('/api/history/:id', (req, res) => {
     const id = req.params.id;
-
-    db.query(
-        "DELETE FROM health_history WHERE id=?", [id],
-        (err) => {
-            if (err) {
-                console.error("❌ Gagal hapus:", err);
-                return res.status(500).json({ error: "Gagal menghapus" });
-            }
-
-            res.json({ deleted: true });
-        }
-    );
+    db.query("DELETE FROM health_history WHERE id=?", [id], err => {
+        if (err) return res.status(500).json({ error: err });
+        res.json({ deleted: true });
+    });
 });
 
-/* =========================
-   ✅ PORT
-   ========================= */
-const PORT = process.env.PORT || 8080;
-
+// =======================
+//  START SERVER (Railway Friendly)
+// =======================
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log("✅ Backend running on port " + PORT);
+    console.log(`🚀 Backend running on port ${PORT}`);
 });
