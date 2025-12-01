@@ -1,114 +1,82 @@
-const express = require('express');
-const cors = require('cors');
-const mysql = require('mysql2');
+const express = require("express");
+const cors = require("cors");
+const mysql = require("mysql2");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔧 CONNECT DATABASE (PAKAI ENV DARI RAILWAY)
+// =============== DATABASE ===============
 const db = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT || 3306,
+    host: process.env.MYSQLHOST,
+    user: process.env.MYSQLUSER,
+    password: process.env.MYSQLPASSWORD,
+    database: process.env.MYSQLDATABASE,
+    port: process.env.MYSQLPORT,
     waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
+    connectionLimit: 10
 });
 
-// CEK KONEKSI
+// TEST CONNECTION
 db.getConnection((err, conn) => {
     if (err) {
-        console.error("❌ Koneksi DB gagal:", err);
+        console.error("❌ DB ERROR:", err);
     } else {
-        console.log("✅ Database connected!");
+        console.log("✅ Database Connected to Railway!");
         conn.release();
     }
 });
 
-// =======================
-//  LOGIC BMI
-// =======================
+// =============== BMI FUNCTIONS ===============
 function hitungBMI(bb, tb) {
-    const tinggiM = tb / 100;
-    return +(bb / (tinggiM * tinggiM)).toFixed(1);
+    const m = tb / 100;
+    return +(bb / (m * m)).toFixed(1);
 }
 
-function statusBMI(bmi) {
-    if (bmi < 18.5) return "Kurus";
-    if (bmi < 25) return "Normal";
-    if (bmi < 30) return "Kelebihan berat badan";
+function statusBMI(b) {
+    if (b < 18.5) return "Kurus";
+    if (b < 25) return "Normal";
+    if (b < 30) return "Kelebihan berat badan";
     return "Obesitas";
 }
 
 function saran(status) {
-    if (status === "Obesitas") {
-        return [
-            "Jogging 20–30 menit",
-            "Diet rendah gula",
-            "Latihan kalistenik ringan"
-        ];
-    }
-    if (status === "Kurus") {
-        return [
-            "Perbanyak nasi & protein",
-            "Konsumsi susu & telur",
-            "Latihan beban ringan"
-        ];
-    }
-    return [
-        "Pertahankan pola makan sehat",
-        "Olahraga rutin 3x seminggu"
-    ];
+    if (status == "Obesitas") return ["Jogging 20–30 menit", "Diet rendah gula", "Latihan kalistenik"];
+    if (status == "Kurus") return ["Perbanyak makan", "Susu & telur", "Latihan beban ringan"];
+    return ["Pola makan sehat", "Olahraga rutin"];
 }
 
-// =======================
-//  API ENDPOINTS
-// =======================
-
-// CREATE DATA
-app.post('/api/check', (req, res) => {
+// =============== ROUTES ===============
+app.post("/api/check", (req, res) => {
     const { name, age, height, weight } = req.body;
-
     const bmi = hitungBMI(weight, height);
-    const status = statusBMI(bmi);
-    const suggestions = saran(status);
+    const sts = statusBMI(bmi);
+    const suggestions = saran(sts);
 
-    const sql = `
-        INSERT INTO health_history (name, age, height, weight, bmi, status)
-        VALUES (?, ?, ?, ?, ?, ?)
-    `;
+    const sql = `INSERT INTO health_history (name, age, height, weight, bmi, status) 
+                 VALUES (?, ?, ?, ?, ?, ?)`;
 
-    db.query(sql, [name, age, height, weight, bmi, status], (err) => {
+    db.query(sql, [name, age, height, weight, bmi, sts], (err) => {
         if (err) return res.status(500).json({ error: err });
 
-        res.json({ bmi, status, suggestions, saved: true });
+        res.json({ bmi, status: sts, suggestions, saved: true });
     });
 });
 
-// READ DATA
-app.get('/api/history', (req, res) => {
+app.get("/api/history", (req, res) => {
     db.query("SELECT * FROM health_history ORDER BY id DESC", (err, rows) => {
         if (err) return res.status(500).json({ error: err });
         res.json(rows);
     });
 });
 
-// DELETE DATA
-app.delete('/api/history/:id', (req, res) => {
-    const id = req.params.id;
-    db.query("DELETE FROM health_history WHERE id=?", [id], err => {
+app.delete("/api/history/:id", (req, res) => {
+    db.query("DELETE FROM health_history WHERE id=?", [req.params.id], (err) => {
         if (err) return res.status(500).json({ error: err });
         res.json({ deleted: true });
     });
 });
 
-// =======================
-//  START SERVER (Railway Friendly)
-// =======================
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 Backend running on port ${PORT}`);
-});
+// =============== PORT ===============
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log("🚀 Backend running on port " + PORT));
